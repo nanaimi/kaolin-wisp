@@ -59,7 +59,7 @@ def parse_args_tyro(config_type, yaml_arg: Optional[str]='--config'):
     path = None
     if yaml_arg is not None:
         path = find_config_file(sys.argv, yaml_arg)
-
+    # sys.argv no longer contains --config=/path/to/config
     cli_subcommand_pos, cli_args = _collect_cli_args_and_subcommands()
     cli_mapping = _resolve_shortened_arg_names(config_type, cli_args)
 
@@ -70,6 +70,8 @@ def parse_args_tyro(config_type, yaml_arg: Optional[str]='--config'):
         config_subcommands, config_args = load_config(path)
 
     # Rebuild sys.argv here in a format that satisfies tyro's conditions for subcommands and full arg names
+    # Consolidates both flattenend yaml and cli args and subcommands passed into one single sys.argv that can be
+    # parsed by argparse and tyro
     _reform_sys_argv(config_type, config_subcommands, config_args, cli_subcommand_pos, cli_args, cli_mapping)
 
     # If printing help, remove the ConsolidateSubcommandArgs marker which disorients the custom formatter
@@ -225,8 +227,10 @@ def _collect_cli_args_and_subcommands():
         a format that satisfies tyro & argparse.
     """
     # Load the script arguments
-    cli_args = set()
-    cli_subcommand_pos = {}
+    # instantiates empty set, sets are builtin python datatypes and do not allow duplicates/only allow unique 
+    # elements, are mutable, unordered and support common set operations (union, intersection, difference, sym. difference)
+    cli_args = set()         # empty set
+    cli_subcommand_pos = {}  # empty dict
     # Start by collecting the real CLI arguments first, these take precedence over everything else
     for i, a in enumerate(sys.argv[1:], 1):
         if a.startswith('--'):

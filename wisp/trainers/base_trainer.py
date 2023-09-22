@@ -201,6 +201,7 @@ class BaseTrainer(ABC):
                                             shuffle=True, pin_memory=True,
                                             num_workers=self.cfg.dataloader.num_workers)
         self.iterations_per_epoch = len(self.train_data_loader)
+        log.info(f"Nr. of iterations per epoch: {self.iterations_per_epoch}. Max nr. epochs: {self.max_epochs}")
 
     def init_optimizer(self):
         """Default initialization for the optimizer.

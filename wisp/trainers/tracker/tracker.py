@@ -9,7 +9,7 @@
 from __future__ import annotations
 import torch
 from abc import ABC, abstractmethod
-from typing import Optional, Any, Dict, Tuple
+from typing import Optional, Any, Dict, Tuple, List
 import os
 from datetime import datetime
 import numpy as np
@@ -414,7 +414,8 @@ class _WandB(_BaseDashboard):
 
     def __init__(self, entity: Optional[str] = None, project: Optional[str] = None,
                  group: Optional[str] = None, run_name: Optional[str] = None,
-                 job_type: Optional[str] = None, sync_tensorboard: Optional[bool] = True):
+                 job_type: Optional[str] = None, sync_tensorboard: Optional[bool] = True, 
+                 wandb_dir: Optional[str] = None, tags: Optional[List[str]] = None):
         """Weights & Biases experiment dashboard.
         See: https://docs.wandb.ai/ref/python/init
 
@@ -425,6 +426,8 @@ class _WandB(_BaseDashboard):
             run_name (Optional[str]): Weights & Biases Run name. Defaults to the run ID.
             job_type (Optional[str]): Weights & Biases Job type, i.e: trainer mode of 'train', 'val', etc.
             sync_tensorboard (Optional[bool]): Sync wandb logs from tensorboard and save the relevant events file.
+            dir (Optional[str]): Path where the wandb runs are saved.
+            tags (Optional[list]): List of tags to add to the run.
         """
         super().__init__()
         self.entity = entity
@@ -433,18 +436,25 @@ class _WandB(_BaseDashboard):
         self.run_name = run_name
         self.job_type = job_type
         self.sync_tensorboard = sync_tensorboard
+        self.dir = wandb_dir
+        self.tags = tags
         self.setup()
 
     def setup(self):
-        wandb.init(
-            project=self.project,
-            group=self.group,
-            name=self.run_name,
-            entity=self.entity,
-            job_type=self.job_type,
-            config=dict(),
-            sync_tensorboard=self.sync_tensorboard
-        )
+        args = {
+            "project": self.project,
+            "group": self.group,
+            "name": self.run_name,
+            "entity": self.entity,
+            "job_type": self.job_type,
+            "config": dict(),
+            "sync_tensorboard": self.sync_tensorboard
+        }
+        if self.dir is not None:
+            args["dir"] = self.dir
+        if self.tags is not None:
+            args["tags"] = self.tags
+        wandb.init(**args)
 
     def teardown(self):
         wandb.finish()
