@@ -8,7 +8,9 @@
 
 import torch
 import torch.nn as nn
+import numpy as np
 from typing import Tuple, Optional
+import logging as log
 
 class MultiTable(nn.Module):
     """Class that holds multiresolution grid tables.
@@ -20,7 +22,8 @@ class MultiTable(nn.Module):
         coord_dim   : int, 
         feature_dim : int, 
         std         : float             = 0.01, 
-        max_feats   : Optional[int]     = None, 
+        max_feats   : Optional[int]     = None,
+        padded      : bool              = False,
     ):
         """
         Args:
@@ -30,7 +33,7 @@ class MultiTable(nn.Module):
             std (float): The standard deviation for the features.
             max_feats (Optional[int]): The max number of features (when in use for hash grids, for example)
         """
-        super().__init__()
+        super(MultiTable).__init__()
 
         self.num_lods = len(resolutions)
         self.max_feats = max_feats
@@ -40,6 +43,7 @@ class MultiTable(nn.Module):
 
         self.coord_dim = coord_dim
         self.feature_dim = feature_dim
+        self.padded = padded            # pad to nearest multiple of 8, just as with INGP
 
         self.resolutions = torch.zeros([self.num_lods, 1], dtype=torch.int64)
         for i in range(len(resolutions)):
@@ -53,6 +57,9 @@ class MultiTable(nn.Module):
             if self.max_feats:
                 num_feats_level = min(self.max_feats, num_feats_level)
             
+            if self.padded:
+                num_feats_level = int(np.ceil(num_feats_level / 8.0) * 8)
+            
             self.begin_idxes[i] = num_so_far
             self.num_feats[i] = num_feats_level
             num_so_far += num_feats_level
@@ -60,7 +67,11 @@ class MultiTable(nn.Module):
         self.begin_idxes[self.num_lods] = num_so_far
 
         self.total_feats = sum(self.num_feats)
-        self.feats = nn.Parameter(torch.randn(self.total_feats, self.feature_dim) * std)
+        
+        # INIT using uniform distribution following INGP
+        self.feats = nn.Parameter((2*10e-4) * torch.rand(self.total_feats, self.feature_dim) - 10e-4)
+
+        log.info(f"Initialized hash grid in {self.coord_dim}D with L: {self.num_lods}, T: {self.max_feats}, F: {self.feature_dim}")
 
     def get_level(self, idx):
         """Gets the features for a specific level.

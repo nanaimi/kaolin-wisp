@@ -33,7 +33,8 @@ class HashGrid(BLASGrid):
         feature_std        : float  = 0.0,
         feature_bias       : float  = 0.0,
         codebook_bitwidth  : int    = 8,
-        coord_dim          : int    = 3  # options: 2, 3
+        coord_dim          : int    = 3,  # options: 2, 3
+        padded             : bool   = False,
     ):
         """Builds a HashGrid instance, including the feature structure and an underlying BLAS for fast queries.
         The hash grid is constructed from a list of resolution sizes (each entry contains a RES for the RES x RES x RES
@@ -56,6 +57,7 @@ class HashGrid(BLASGrid):
             feature_bias (float): The features are initialized with a Gaussian distribution with the given mean.
             codebook_bitwidth (int): Codebook dictionary_size is set as 2**bitwidth
             coord_dim (int): The dimension of the input coordinates. Should be 2 or 3.
+            padded (bool): Pads the number of entries to nearest next multiple of 8 if set to true.
         """
         # Occupancy Structure
         super().__init__(blas)
@@ -83,7 +85,14 @@ class HashGrid(BLASGrid):
         self.codebook_size = 2 ** self.codebook_bitwidth
 
         self.coord_dim = coord_dim
-        self.codebook = MultiTable(resolutions, self.coord_dim, self.feature_dim, self.feature_std, self.codebook_size)
+        self.padded = padded
+
+        self.codebook = MultiTable(resolutions=resolutions, 
+                                    coord_dim=self.coord_dim, 
+                                    feature_dim=self.feature_dim, 
+                                    std=self.feature_std, 
+                                    max_feats=self.codebook_size,
+                                    padded=self.padded)
 
     # TODO(Nasib): add the coord_dim argument
     @classmethod
@@ -133,7 +142,8 @@ class HashGrid(BLASGrid):
                        codebook_bitwidth  : int   = 8,
                        min_grid_res       : int   = 16,
                        max_grid_res       : int   = None,
-                       coord_dim          : int   = 3) -> HashGrid:
+                       coord_dim          : int   = 3,
+                       padded             : bool  = False) -> HashGrid:
         """
         Builds a hash grid using the geometric sequence initialization pattern from Muller et al. 2022 (Instant-NGP).
         This is an implementation of the geometric multiscale grid from
@@ -157,10 +167,27 @@ class HashGrid(BLASGrid):
             min_grid_res (int): min resolution of the feature grid.
             max_grid_res (int): max resolution of the feature grid.
         """
-        b = np.exp((np.log(max_grid_res) - np.log(min_grid_res)) / (num_lods-1))
-        resolutions = [int(np.floor(min_grid_res*(b**l))) for l in range(num_lods)]
+        ## OLD CODE
+        # b = np.exp((np.log(max_grid_res) - np.log(min_grid_res)) / (num_lods-1))
+        # resolutions = [int(1 + np.floor(min_grid_res*(b**l))) for l in range(num_lods)]
+
+        ## ACCORDING TO INGP
+        def compute_per_level_scale(max_res, min_res, nr_levels):
+            return np.exp((np.log(max_res) - np.log(min_res)) / (nr_levels-1))
+
+        b = compute_per_level_scale(max_grid_res, min_grid_res, num_lods)
+
+        # As implemented in INGP Codebase: https://github.com/NVlabs/instant-ngp
+        def grid_res(level, base_res, per_level_scale):
+            tmp_res = np.exp2(level * np.log2(per_level_scale)) * min_grid_res - 1.0
+            resolution = int(np.ceil(tmp_res) + 1)
+            return resolution
+
+        get_grid_res_by_level = lambda l: grid_res(l, min_grid_res, b)
+        resolutions = [get_grid_res_by_level(l) for l in range(num_lods)]
+
         return cls(blas=blas, feature_dim=feature_dim, resolutions=resolutions, multiscale_type=multiscale_type,
-                   feature_std=feature_std, feature_bias=feature_bias, codebook_bitwidth=codebook_bitwidth, coord_dim=coord_dim)
+                   feature_std=feature_std, feature_bias=feature_bias, codebook_bitwidth=codebook_bitwidth, coord_dim=coord_dim, padded=padded)
 
     @classmethod
     def from_resolutions(cls,

@@ -58,13 +58,28 @@ class ImageNeuralField(BaseNeuralField):
         else:
             self.feature_dim = self.grid.feature_dim
 
-        self.embedder, self.embed_dim = get_positional_embedder(frequencies=3, include_input=True)
-        self.embed_dim = 14
-        self.input_dim = self.feature_dim + self.embed_dim
+        # self.embedder, self.embed_dim = get_positional_embedder(frequencies=3, include_input=True)
+        # self.embed_dim = 14
+        # self.input_dim = self.feature_dim + self.embed_dim
+        
+        # original has no position encoding embedder
+        self.input_dim = self.feature_dim
 
-        self.decoder = BasicDecoder(self.input_dim, 3, get_activation_class(self.activation_type), True,
-                                    layer=get_layer_class(self.layer_type), num_layers=self.num_layers,
-                                    hidden_dim=self.hidden_dim, skip=[])
+        self.decoder = BasicDecoder(input_dim=self.input_dim, 
+                                    output_dim=3, 
+                                    activation=get_activation_class(self.activation_type), 
+                                    bias=False, # TODO(Nasib): Change to False
+                                    layer=get_layer_class(self.layer_type), 
+                                    num_layers=self.num_layers,
+                                    hidden_dim=self.hidden_dim, 
+                                    skip=[])
+        
+        # Glorot and Bengio initialization as in INGP
+        for layer in self.decoder.layers:
+            nn.init.xavier_uniform_(layer.weight, gain=nn.init.calculate_gain("relu"))
+        nn.init.xavier_uniform_(self.decoder.lout.weight, gain=1.)
+        
+        log.info(f"Image NEF: feature grid output dim: {self.feature_dim}, input dim to decoder: {self.input_dim}")
 
     def register_forward_functions(self):
         """Register the forward functions.
@@ -87,11 +102,12 @@ class ImageNeuralField(BaseNeuralField):
         
         feats = self.grid.interpolate(coords, lod).reshape(-1, self.feature_dim)
 
-        embedded_pos = self.embedder(coords).view(batch, self.embed_dim)
-        fpos = torch.cat([feats, embedded_pos], dim=-1)
+        # embedded_pos = self.embedder(coords).view(batch, self.embed_dim)
+        # fpos = torch.cat([feats, embedded_pos], dim=-1)
         
-        # fpos = feats
+        fpos = feats
 
         rgb = torch.sigmoid(self.decoder(fpos))
+        # rgb = self.decoder(fpos)
 
         return rgb
