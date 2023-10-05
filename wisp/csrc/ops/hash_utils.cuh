@@ -112,4 +112,7 @@ clamp(float x, float a, float b)
 }
 
 }
+
+// TODO(Nasib): add new hash functions here
+
 #endif

@@ -211,6 +211,8 @@ hashgrid_interpolate_3d_backward_cuda_kernel(
     }
 }
 
+// TODO(nasib): add new kernel with straight through estimator
+
 template<typename scalar_t>
 __global__ void
 hashgrid_interpolate_2d_cuda_kernel(
@@ -264,6 +266,7 @@ hashgrid_interpolate_2d_cuda_kernel(
     }
 } 
 
+// TODO(Nasib): add new backward kernel with straight through estimator
 
 template<typename scalar_t>
 __global__ void
