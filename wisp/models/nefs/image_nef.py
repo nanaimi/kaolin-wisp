@@ -46,7 +46,7 @@ class ImageNeuralField(BaseNeuralField):
                  hidden_dim: int = 128,
                  num_layers:int = 1):
         
-        super().__init__()
+        super(ImageNeuralField).__init__()
  
         self.grid = grid
         self.activation_type = activation_type
@@ -78,7 +78,7 @@ class ImageNeuralField(BaseNeuralField):
         for layer in self.decoder.layers:
             nn.init.xavier_uniform_(layer.weight, gain=nn.init.calculate_gain("relu"))
         nn.init.xavier_uniform_(self.decoder.lout.weight, gain=1.)
-        
+
         log.info(f"Image NEF: feature grid output dim: {self.feature_dim}, input dim to decoder: {self.input_dim}")
 
     def register_forward_functions(self):
@@ -99,15 +99,11 @@ class ImageNeuralField(BaseNeuralField):
             lod = len(self.grid.resolutions) - 1
         
         batch, _ = coords.shape
-        
         feats = self.grid.interpolate(coords, lod).reshape(-1, self.feature_dim)
 
         # embedded_pos = self.embedder(coords).view(batch, self.embed_dim)
         # fpos = torch.cat([feats, embedded_pos], dim=-1)
-        
         fpos = feats
-
         rgb = torch.sigmoid(self.decoder(fpos))
-        # rgb = self.decoder(fpos)
 
         return rgb
